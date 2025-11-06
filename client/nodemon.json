@@ -1,0 +1,6 @@
+{
+  "watch": ["src/**/*"],
+  "ext": "ts,tsx,js,jsx,json,css",
+  "ignore": ["node_modules", "build", "public"],
+  "exec": "craco start"
+}
