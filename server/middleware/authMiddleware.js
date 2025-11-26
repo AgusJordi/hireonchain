@@ -1,14 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// Generate JWT token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
-};
-
-module.exports = { generateToken };
 // Authentication middleware
 const protect = async (req, res, next) => {
   let token;
@@ -41,7 +33,7 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Admin/Client role check
+// Client role check
 const isClient = (req, res, next) => {
   if (req.user && req.user.role === "client") {
     next();
@@ -61,4 +53,4 @@ const isFreelancer = (req, res, next) => {
   }
 };
 
-module.exports = { generateToken, protect, isClient, isFreelancer };
+module.exports = { protect, isClient, isFreelancer };

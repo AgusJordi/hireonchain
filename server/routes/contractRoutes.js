@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+
 const {
   createContract,
   getContracts,
@@ -7,24 +8,22 @@ const {
   updateContractStatus,
   disputeContract,
 } = require("../controllers/contractController");
+
 const { protect } = require("../middleware/authMiddleware");
 
-// All routes are protected
-router.use(protect);
-
 // Create a new contract
-router.post("/", createContract);
+router.post("/", protect, createContract);
 
 // Get all contracts for the current user
-router.get("/", getContracts);
+router.get("/", protect, getContracts);
 
 // Get contract by ID
-router.get("/:id", getContractById);
+router.get("/:id", protect, getContractById);
 
 // Update contract status
-router.put("/:id/status", updateContractStatus);
+router.put("/:id/status", protect, updateContractStatus);
 
 // Dispute a contract
-router.post("/:id/dispute", disputeContract);
+router.post("/:id/dispute", protect, disputeContract);
 
 module.exports = router;

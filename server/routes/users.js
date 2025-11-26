@@ -8,7 +8,7 @@ const {
   getFreelancers,
   addUserReview,
 } = require("../controllers/userController");
-const { protect } = require("../utils/auth");
+const { protect } = require("../middleware/authMiddleware"); // KORRIGIERTER PFAD
 
 const router = express.Router();
 

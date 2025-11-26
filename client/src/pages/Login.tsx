@@ -55,7 +55,7 @@ const Login: React.FC = () => {
     setError("");
 
     try {
-      const response = await axios.post("/api/users/login", formData);
+      const response = await axios.post("http://localhost:5000/api/users/login", formData);
 
       // Verify if the wallet address matches
       if (publicKey && response.data.walletAddress !== publicKey.toString()) {
