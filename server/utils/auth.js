@@ -8,7 +8,6 @@ const generateToken = (id) => {
   });
 };
 
-module.exports = { generateToken };
 // Authentication middleware
 const protect = async (req, res, next) => {
   let token;

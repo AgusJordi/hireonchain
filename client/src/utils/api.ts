@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 // Create an axios instance
 const api = axios.create({
@@ -34,7 +34,7 @@ api.interceptors.response.use(
       // Token expired or invalid, logout user
       localStorage.removeItem("token");
       localStorage.removeItem("userInfo");
-      window.location.href = "/login";
+      // window.location.href = "/login";
     }
     return Promise.reject(error);
   }

@@ -8,13 +8,15 @@ const {
   getFreelancers,
   addUserReview,
 } = require("../controllers/userController");
-const { protect } = require("../middleware/authMiddleware"); // KORRIGIERTER PFAD
+const { protect } = require("../utils/auth");
+const { rateLimiter } = require("../midleware/rateLimiter");
+const { validateRegister, validateLogin } = require("../midleware/auth.validation");
 
 const router = express.Router();
 
 // Public routes
-router.post("/", registerUser);
-router.post("/login", loginUser);
+router.post("/",rateLimiter, validateRegister, registerUser);
+router.post("/login",rateLimiter,validateLogin, loginUser);
 router.get("/freelancers", getFreelancers);
 
 // Protected routes

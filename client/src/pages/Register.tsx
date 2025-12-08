@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import api from "../utils/api";
 import WalletRegistration from "../components/WalletRegistration";
 import axios from "axios";
+
 const Register: React.FC = () => {
   const navigate = useNavigate();
-  const { connected, publicKey, disconnect } = useWallet();
+  const { connected } = useWallet();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -23,16 +24,13 @@ const Register: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  // Update wallet address when wallet is connected
-  useEffect(() => {
-    if (connected && publicKey) {
-      const walletAddress = publicKey.toString();
-      setFormData((prevData) => ({
-        ...prevData,
-        walletAddress,
-      }));
-    }
-  }, [connected, publicKey]);
+  // Used useCallback to memoize this function so it doesn't change on every render
+  const handleWalletConnected = useCallback((walletAddress: string) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      walletAddress,
+    }));
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -41,13 +39,11 @@ const Register: React.FC = () => {
   ) => {
     const { name, value } = e.target;
 
-    // Update form data
     setFormData((prevData) => ({
       ...prevData,
       [name]: value,
     }));
 
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors((prevErrors) => {
         const newErrors = { ...prevErrors };
@@ -55,13 +51,6 @@ const Register: React.FC = () => {
         return newErrors;
       });
     }
-  };
-
-  const handleWalletConnected = (walletAddress: string) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      walletAddress,
-    }));
   };
 
   const validateForm = () => {
@@ -111,7 +100,6 @@ const Register: React.FC = () => {
     setApiError("");
 
     try {
-      // Prepare data for API
       const userData = {
         username: formData.username,
         email: formData.email,
@@ -125,18 +113,16 @@ const Register: React.FC = () => {
         bio: formData.bio,
       };
 
-      const response = await api.post("/users", userData);
-
-      // Save token and user info to localStorage
+      const response = await api.post("/api/users", userData);
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("userInfo", JSON.stringify(response.data));
-
+      window.dispatchEvent(new Event("auth-change"));
       navigate("/dashboard");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         setApiError(
           error.response.data.message ||
-            "Registration failed. Please try again."
+          "Registration failed. Please try again."
         );
       } else {
         setApiError("Registration failed. Please try again.");
@@ -145,9 +131,6 @@ const Register: React.FC = () => {
 
     setIsSubmitting(false);
   };
-
-  console.log("Form data:", formData); // Debug logging
-
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full mx-auto space-y-8">
@@ -186,9 +169,8 @@ const Register: React.FC = () => {
                   type="text"
                   value={formData.username}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.username ? "border-red-300" : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  className={`appearance-none block w-full px-3 py-2 border ${errors.username ? "border-red-300" : "border-gray-300"
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                   placeholder="Enter your username"
                 />
                 {errors.username && (
@@ -212,9 +194,8 @@ const Register: React.FC = () => {
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.email ? "border-red-300" : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  className={`appearance-none block w-full px-3 py-2 border ${errors.email ? "border-red-300" : "border-gray-300"
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                   placeholder="Enter your email"
                 />
                 {errors.email && (
@@ -238,9 +219,8 @@ const Register: React.FC = () => {
                   autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.password ? "border-red-300" : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  className={`appearance-none block w-full px-3 py-2 border ${errors.password ? "border-red-300" : "border-gray-300"
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                   placeholder="Enter your password"
                 />
                 {errors.password && (
@@ -264,11 +244,10 @@ const Register: React.FC = () => {
                   autoComplete="new-password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    errors.confirmPassword
+                  className={`appearance-none block w-full px-3 py-2 border ${errors.confirmPassword
                       ? "border-red-300"
                       : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                   placeholder="Confirm your password"
                 />
                 {errors.confirmPassword && (
@@ -316,9 +295,8 @@ const Register: React.FC = () => {
                       type="text"
                       value={formData.skills}
                       onChange={handleChange}
-                      className={`appearance-none block w-full px-3 py-2 border ${
-                        errors.skills ? "border-red-300" : "border-gray-300"
-                      } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                      className={`appearance-none block w-full px-3 py-2 border ${errors.skills ? "border-red-300" : "border-gray-300"
+                        } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="E.g. React, Node.js, Solana"
                     />
                     {errors.skills && (
@@ -365,13 +343,12 @@ const Register: React.FC = () => {
                   type="text"
                   value={formData.walletAddress}
                   readOnly
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    formData.walletAddress
+                  className={`appearance-none block w-full px-3 py-2 border ${formData.walletAddress
                       ? "border-green-300 bg-green-50"
                       : errors.walletAddress
-                      ? "border-red-300"
-                      : "border-gray-300"
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                        ? "border-red-300"
+                        : "border-gray-300"
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                   placeholder="Connect wallet to auto-fill"
                 />
                 {errors.walletAddress && (
@@ -386,11 +363,10 @@ const Register: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSubmitting || !connected}
-                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                  isSubmitting || !connected
+                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isSubmitting || !connected
                     ? "bg-indigo-300 cursor-not-allowed"
                     : "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                }`}
+                  }`}
               >
                 {isSubmitting ? "Registering..." : "Register"}
               </button>
