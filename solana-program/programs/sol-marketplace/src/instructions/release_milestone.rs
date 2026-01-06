@@ -1,9 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program;
 use crate::state::{Job, Milestone, PlatformConfig, JobStatus, MilestoneStatus, seeds};
 use crate::errors::FreelanceError;
 use crate::events::MilestonePaid;
 
 pub fn release_milestone_handler(ctx: Context<ReleaseMilestone>) -> Result<()> {
+    // Extract values needed for PDA seeds before mutable borrows
+    let job_key = ctx.accounts.job.key();
+    let vault_bump = ctx.accounts.job.vault_bump;
+    let fee_bps = ctx.accounts.platform_config.fee_bps;
+
     let job = &mut ctx.accounts.job;
     let milestone = &mut ctx.accounts.milestone;
     let platform_config = &mut ctx.accounts.platform_config;
@@ -21,7 +27,7 @@ pub fn release_milestone_handler(ctx: Context<ReleaseMilestone>) -> Result<()> {
     let milestone_amount = milestone.amount;
 
     let fee = milestone_amount
-        .checked_mul(platform_config.fee_bps as u64)
+        .checked_mul(fee_bps as u64)
         .ok_or(FreelanceError::Overflow)?
         .checked_div(10000)
         .ok_or(FreelanceError::Overflow)?;
@@ -35,27 +41,36 @@ pub fn release_milestone_handler(ctx: Context<ReleaseMilestone>) -> Result<()> {
         FreelanceError::InsufficientFunds
     );
 
-    **ctx.accounts.vault.try_borrow_mut_lamports()? = ctx
-        .accounts
-        .vault
-        .lamports()
-        .checked_sub(milestone_amount)
-        .ok_or(FreelanceError::InsufficientFunds)?;
+    // Build vault PDA signer seeds
+    let vault_seeds: &[&[u8]] = &[seeds::VAULT, job_key.as_ref(), &[vault_bump]];
+    let signer_seeds = &[vault_seeds];
 
-    **ctx.accounts.freelancer.try_borrow_mut_lamports()? = ctx
-        .accounts
-        .freelancer
-        .lamports()
-        .checked_add(freelancer_payment)
-        .ok_or(FreelanceError::Overflow)?;
+    // Transfer freelancer payment from vault
+    system_program::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            system_program::Transfer {
+                from: ctx.accounts.vault.to_account_info(),
+                to: ctx.accounts.freelancer.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        freelancer_payment,
+    )?;
 
+    // Transfer platform fee from vault to treasury
     if fee > 0 {
-        **ctx.accounts.treasury.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .treasury
-            .lamports()
-            .checked_add(fee)
-            .ok_or(FreelanceError::Overflow)?;
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.treasury.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            fee,
+        )?;
 
         platform_config.total_fees_collected = platform_config
             .total_fees_collected
