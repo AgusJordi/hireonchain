@@ -37,7 +37,7 @@ A decentralized job marketplace platform built on Solana blockchain, enabling se
 ## 🏗 Project Structure
 
 ```
-web3-project/
+hireonchain/
 ├── client/           # React frontend application
 ├── server/           # Node.js backend server
 └── solana-program/   # Solana smart contract
@@ -46,8 +46,8 @@ web3-project/
 ## 🚦 Getting Started
 
 ### Prerequisites
-
-- Node.js (v14 or higher)
+- VScode
+- Node.js (v18 or higher)
 - Rust and Cargo
 - Solana CLI tools
 - MongoDB
@@ -58,7 +58,7 @@ web3-project/
 
    ```bash
    git clone 
-   cd web3-project
+   cd sol-freelance
    ```
 
 2. Install frontend dependencies:
