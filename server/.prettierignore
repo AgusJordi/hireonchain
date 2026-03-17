@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build outputs
+dist
+build
+.vite
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Logs
+*.log
+
+# IDE
+.vscode
+.idea
+
+# Git
+.git
+
+# Other
+coverage
+*.md
+*.min.js
+solana-program

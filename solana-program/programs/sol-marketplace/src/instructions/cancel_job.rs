@@ -7,8 +7,14 @@ pub fn cancel_job_handler(ctx: Context<CancelJob>) -> Result<()> {
     let job = &mut ctx.accounts.job;
 
     require!(
-        job.status == JobStatus::Created,
+        job.status == JobStatus::Created
+            || job.status == JobStatus::Funded
+            || job.status == JobStatus::InProgress,
         FreelanceError::InvalidJobStatus
+    );
+    require!(
+        job.milestones_approved == 0,
+        FreelanceError::CannotCancelWithApprovedMilestones
     );
 
     let clock = Clock::get()?;
@@ -51,7 +57,7 @@ pub struct CancelJob<'info> {
         mut,
         constraint = job.client == client.key() @ FreelanceError::UnauthorizedClient,
         constraint = job.status != JobStatus::Disputed @ FreelanceError::CannotCancelWithActiveDispute,
-        constraint = job.milestones_paid == 0 @ FreelanceError::CannotCancelWithApprovedMilestones,
+        constraint = job.milestones_approved == 0 @ FreelanceError::CannotCancelWithApprovedMilestones,
         seeds = [seeds::JOB, job.client.as_ref(), &job.job_id.to_le_bytes()],
         bump = job.bump
     )]

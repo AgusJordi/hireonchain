@@ -77,6 +77,7 @@ pub struct Job {
     pub escrow_balance: u64,
     pub milestone_count: u8,
     pub milestones_paid: u8,
+    pub milestones_approved: u8,
     pub status: JobStatus,
     pub token_mint: Pubkey,
     pub created_at: i64,

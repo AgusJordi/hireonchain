@@ -1,4 +1,4 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 const {
   createContract,
@@ -6,25 +6,25 @@ const {
   getContractById,
   updateContractStatus,
   disputeContract,
-} = require("../controllers/contractController");
-const { protect } = require("../middleware/authMiddleware"); // KORRIGIERTER PFAD
+} = require('../controllers/contractController');
+const { protect } = require('../middleware/authMiddleware'); // KORRIGIERTER PFAD
 
 // All routes are protected
 router.use(protect);
 
 // Create a new contract
-router.post("/", createContract);
+router.post('/', createContract);
 
 // Get all contracts for the current user
-router.get("/", getContracts);
+router.get('/', getContracts);
 
 // Get contract by ID
-router.get("/:id", getContractById);
+router.get('/:id', getContractById);
 
 // Update contract status
-router.put("/:id/status", updateContractStatus);
+router.put('/:id/status', updateContractStatus);
 
 // Dispute a contract
-router.post("/:id/dispute", disputeContract);
+router.post('/:id/dispute', disputeContract);
 
 module.exports = router;

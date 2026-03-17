@@ -1,26 +1,26 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const contractSchema = new mongoose.Schema(
   {
     jobId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Job",
+      ref: 'Job',
       required: true,
     },
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     freelancerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     status: {
       type: String,
-      enum: ["pending", "funded", "in_progress", "completed", "disputed"],
-      default: "pending",
+      enum: ['pending', 'funded', 'in_progress', 'completed', 'disputed'],
+      default: 'pending',
     },
     amount: {
       type: Number,
@@ -48,9 +48,9 @@ const contractSchema = new mongoose.Schema(
 );
 
 // Update the updatedAt timestamp
-contractSchema.pre("save", function (next) {
+contractSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model("Contract", contractSchema);
+module.exports = mongoose.model('Contract', contractSchema);

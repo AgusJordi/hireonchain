@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::state::{Job, Dispute, PlatformConfig, JobStatus, DisputeStatus, DisputeRuling, seeds};
+use crate::state::{Job, Dispute, Milestone, MilestoneStatus, PlatformConfig, JobStatus, DisputeStatus, DisputeRuling, seeds};
 use crate::errors::FreelanceError;
 use crate::events::DisputeResolved;
 
@@ -73,7 +73,35 @@ pub fn resolve_dispute_handler(ctx: Context<ResolveDispute>, ruling: DisputeRuli
     dispute.resolved_at = clock.unix_timestamp;
 
     job.escrow_balance = 0;
-    job.status = JobStatus::Completed;
+
+    // Update disputed milestone status and job counters
+    let milestone = &mut ctx.accounts.milestone;
+    match ruling {
+        DisputeRuling::FreelancerWins | DisputeRuling::Split { .. } => {
+            milestone.status = MilestoneStatus::Paid;
+            milestone.paid_at = clock.unix_timestamp;
+            job.milestones_paid = job
+                .milestones_paid
+                .checked_add(1)
+                .ok_or(FreelanceError::Overflow)?;
+        }
+        DisputeRuling::ClientWins => {
+            milestone.status = MilestoneStatus::Pending;
+            if job.milestones_approved > 0 {
+                job.milestones_approved = job
+                    .milestones_approved
+                    .checked_sub(1)
+                    .ok_or(FreelanceError::Overflow)?;
+            }
+        }
+        DisputeRuling::None => unreachable!(),
+    }
+
+    if job.milestones_paid == job.milestone_count {
+        job.status = JobStatus::Completed;
+    } else {
+        job.status = JobStatus::InProgress;
+    }
 
     let ruling_str = match ruling {
         DisputeRuling::ClientWins => "ClientWins".to_string(),
@@ -120,6 +148,15 @@ pub struct ResolveDispute<'info> {
         bump = dispute.bump
     )]
     pub dispute: Account<'info, Dispute>,
+
+    #[account(
+        mut,
+        constraint = milestone.job == job.key() @ FreelanceError::InvalidMilestoneId,
+        constraint = milestone.milestone_id == dispute.milestone_id @ FreelanceError::InvalidMilestoneId,
+        seeds = [seeds::MILESTONE, job.key().as_ref(), &[dispute.milestone_id]],
+        bump = milestone.bump
+    )]
+    pub milestone: Account<'info, Milestone>,
 
     /// CHECK: PDA validated by seeds
     #[account(

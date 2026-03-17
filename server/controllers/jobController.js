@@ -1,5 +1,5 @@
-const Job = require("../models/Job");
-const User = require("../models/User");
+const Job = require('../models/Job');
+const User = require('../models/User');
 
 // @desc    Create a new job
 // @route   POST /api/jobs
@@ -20,7 +20,7 @@ const createJob = async (req, res) => {
     res.status(201).json(job);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -30,13 +30,13 @@ const createJob = async (req, res) => {
 const getJobs = async (req, res) => {
   try {
     const jobs = await Job.find({})
-      .populate("client", "username email walletAddress")
-      .populate("assignedTo", "username email walletAddress")
+      .populate('client', 'username email walletAddress')
+      .populate('assignedTo', 'username email walletAddress')
       .sort({ createdAt: -1 });
     res.json(jobs);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -46,21 +46,18 @@ const getJobs = async (req, res) => {
 const getJobById = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
-      .populate("client", "username email walletAddress")
-      .populate("assignedTo", "username email walletAddress")
-      .populate(
-        "proposals.freelancer",
-        "username email walletAddress skills rating"
-      );
+      .populate('client', 'username email walletAddress')
+      .populate('assignedTo', 'username email walletAddress')
+      .populate('proposals.freelancer', 'username email walletAddress skills rating');
 
     if (job) {
       res.json(job);
     } else {
-      res.status(404).json({ message: "Job not found" });
+      res.status(404).json({ message: 'Job not found' });
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -74,22 +71,19 @@ const updateJob = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if user is the job owner
     if (job.client.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Don't allow updating if job is already in progress or completed
-    if (job.status !== "open" && status === "open") {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Cannot update a job that is already in progress or completed",
-        });
+    if (job.status !== 'open' && status === 'open') {
+      return res.status(400).json({
+        message: 'Cannot update a job that is already in progress or completed',
+      });
     }
 
     job.title = title || job.title;
@@ -103,7 +97,7 @@ const updateJob = async (req, res) => {
     res.json(updatedJob);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -115,26 +109,24 @@ const deleteJob = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if user is the job owner
     if (job.client.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Don't allow deleting if job is already in progress
-    if (job.status === "in_progress") {
-      return res
-        .status(400)
-        .json({ message: "Cannot delete a job that is in progress" });
+    if (job.status === 'in_progress') {
+      return res.status(400).json({ message: 'Cannot delete a job that is in progress' });
     }
 
     await job.remove();
-    res.json({ message: "Job removed" });
+    res.json({ message: 'Job removed' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -148,25 +140,23 @@ const submitProposal = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if job is open
-    if (job.status !== "open") {
-      return res.status(400).json({ message: "Job is not open for proposals" });
+    if (job.status !== 'open') {
+      return res.status(400).json({ message: 'Job is not open for proposals' });
     }
 
     // Check if user has already submitted a proposal
     const alreadySubmitted = job.proposals.find(
-      (p) => p.freelancer.toString() === req.user._id.toString()
+      p => p.freelancer.toString() === req.user._id.toString()
     );
 
     if (alreadySubmitted) {
-      return res
-        .status(400)
-        .json({
-          message: "You have already submitted a proposal for this job",
-        });
+      return res.status(400).json({
+        message: 'You have already submitted a proposal for this job',
+      });
     }
 
     // Add proposal
@@ -177,10 +167,10 @@ const submitProposal = async (req, res) => {
     });
 
     await job.save();
-    res.status(201).json({ message: "Proposal submitted successfully" });
+    res.status(201).json({ message: 'Proposal submitted successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -192,33 +182,33 @@ const acceptProposal = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if user is the job owner
     if (job.client.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Find the proposal
     const proposal = job.proposals.id(req.params.proposalId);
 
     if (!proposal) {
-      return res.status(404).json({ message: "Proposal not found" });
+      return res.status(404).json({ message: 'Proposal not found' });
     }
 
     // Update proposal status
-    proposal.status = "accepted";
+    proposal.status = 'accepted';
 
     // Update job status and assignedTo
-    job.status = "in_progress";
+    job.status = 'in_progress';
     job.assignedTo = proposal.freelancer;
 
     await job.save();
-    res.json({ message: "Proposal accepted" });
+    res.json({ message: 'Proposal accepted' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -230,29 +220,29 @@ const rejectProposal = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if user is the job owner
     if (job.client.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Find the proposal
     const proposal = job.proposals.id(req.params.proposalId);
 
     if (!proposal) {
-      return res.status(404).json({ message: "Proposal not found" });
+      return res.status(404).json({ message: 'Proposal not found' });
     }
 
     // Update proposal status
-    proposal.status = "rejected";
+    proposal.status = 'rejected';
 
     await job.save();
-    res.json({ message: "Proposal rejected" });
+    res.json({ message: 'Proposal rejected' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -264,27 +254,27 @@ const completeJob = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Check if user is the job owner
     if (job.client.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     // Check if job is in progress
-    if (job.status !== "in_progress") {
-      return res.status(400).json({ message: "Job is not in progress" });
+    if (job.status !== 'in_progress') {
+      return res.status(400).json({ message: 'Job is not in progress' });
     }
 
     // Update job status
-    job.status = "completed";
+    job.status = 'completed';
 
     await job.save();
-    res.json({ message: "Job marked as completed" });
+    res.json({ message: 'Job marked as completed' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -294,12 +284,12 @@ const completeJob = async (req, res) => {
 const getClientJobs = async (req, res) => {
   try {
     const jobs = await Job.find({ client: req.user._id })
-      .populate("assignedTo", "username email walletAddress")
+      .populate('assignedTo', 'username email walletAddress')
       .sort({ createdAt: -1 });
     res.json(jobs);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -309,12 +299,12 @@ const getClientJobs = async (req, res) => {
 const getFreelancerJobs = async (req, res) => {
   try {
     const jobs = await Job.find({ assignedTo: req.user._id })
-      .populate("client", "username email walletAddress")
+      .populate('client', 'username email walletAddress')
       .sort({ createdAt: -1 });
     res.json(jobs);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -328,7 +318,7 @@ const updateJobContract = async (req, res) => {
     const job = await Job.findById(req.params.id);
 
     if (!job) {
-      return res.status(404).json({ message: "Job not found" });
+      return res.status(404).json({ message: 'Job not found' });
     }
 
     // Only allow client or assigned freelancer to update contract address
@@ -336,7 +326,7 @@ const updateJobContract = async (req, res) => {
       job.client.toString() !== req.user._id.toString() &&
       job.assignedTo.toString() !== req.user._id.toString()
     ) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     job.contractAddress = contractAddress;
@@ -345,7 +335,7 @@ const updateJobContract = async (req, res) => {
     res.json(updatedJob);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

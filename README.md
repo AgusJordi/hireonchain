@@ -16,7 +16,7 @@ A decentralized job marketplace platform built on Solana blockchain, enabling se
 
 ### Frontend
 
-- React.js with TypeScript
+- React.js with Vite
 - Tailwind CSS for styling
 - Web3 integration with Solana wallet adapters
 - Modern component architecture
@@ -31,14 +31,14 @@ A decentralized job marketplace platform built on Solana blockchain, enabling se
 ### Blockchain
 
 - Solana Program (Smart Contract)
-- Rust programming language
+- Rust / Anchor escrow initialization
 - Solana Web3.js for blockchain interactions
 
 ## 🏗 Project Structure
 
 ```
 hireonchain/
-├── client/           # React frontend application
+├── app/           # React frontend application
 ├── server/           # Node.js backend server
 └── solana-program/   # Solana smart contract
 ```
@@ -48,7 +48,7 @@ hireonchain/
 ### Prerequisites
 - VScode
 - Node.js (v18 or higher)
-- Rust and Cargo
+- Anchor and Cargo
 - Solana CLI tools
 - MongoDB
 
@@ -58,13 +58,13 @@ hireonchain/
 
    ```bash
    git clone 
-   cd sol-freelance
+   cd hireonchain
    ```
 
 2. Install frontend dependencies:
 
    ```bash
-   cd client
+   cd app
    npm install
    ```
 
@@ -83,7 +83,7 @@ hireonchain/
    ```
 
 5. Set up environment variables:
-   - Create `.env` files in both `client/` and `server/` directories
+   - Create `.env` files in both `app/` and `server/` directories
    - Add necessary environment variables (see `.env.example` files)
 
 ### Running the Application
@@ -91,8 +91,8 @@ hireonchain/
 1. Start the frontend:
 
    ```bash
-   cd client
-   npm start
+   cd app
+   npm run dev
    ```
 
 2. Start the backend server:

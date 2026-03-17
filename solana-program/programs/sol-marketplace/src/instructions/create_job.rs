@@ -35,6 +35,7 @@ pub fn create_job_handler(
     job.escrow_balance = 0;
     job.milestone_count = milestone_amounts.len() as u8;
     job.milestones_paid = 0;
+    job.milestones_approved = 0;
     job.status = JobStatus::Created;
     job.token_mint = ctx.accounts.token_mint.key();
     job.created_at = clock.unix_timestamp;

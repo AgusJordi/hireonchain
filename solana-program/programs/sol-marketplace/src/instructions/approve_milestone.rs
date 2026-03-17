@@ -4,7 +4,7 @@ use crate::errors::FreelanceError;
 use crate::events::MilestoneApproved;
 
 pub fn approve_milestone_handler(ctx: Context<ApproveMilestone>) -> Result<()> {
-    let job = &ctx.accounts.job;
+    let job = &mut ctx.accounts.job;
     let milestone = &mut ctx.accounts.milestone;
 
     require!(
@@ -21,6 +21,11 @@ pub fn approve_milestone_handler(ctx: Context<ApproveMilestone>) -> Result<()> {
     milestone.status = MilestoneStatus::Approved;
     milestone.approved_at = clock.unix_timestamp;
 
+    job.milestones_approved = job
+        .milestones_approved
+        .checked_add(1)
+        .ok_or(FreelanceError::Overflow)?;
+
     emit!(MilestoneApproved {
         job_id: job.job_id,
         milestone_id: milestone.milestone_id,
@@ -35,6 +40,7 @@ pub struct ApproveMilestone<'info> {
     pub client: Signer<'info>,
 
     #[account(
+        mut,
         constraint = job.client == client.key() @ FreelanceError::UnauthorizedClient,
         constraint = job.status == JobStatus::InProgress @ FreelanceError::InvalidJobStatus,
         seeds = [seeds::JOB, job.client.as_ref(), &job.job_id.to_le_bytes()],
