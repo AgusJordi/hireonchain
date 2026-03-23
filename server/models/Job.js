@@ -14,6 +14,11 @@ const JobSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Job price is required'],
   },
+  onChainJobId: {
+    type: Number,
+    unique: true,
+    sparse: true,
+  },
   client: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

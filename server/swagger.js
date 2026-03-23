@@ -12,7 +12,7 @@ function extractRoutes(content, file) {
     routes.push({
       method: match[1],
       path: match[2],
-      file: file.replace('src/', '').replace(/\.(ts|js)$/, ''),
+      file: path.basename(file, '.js'),
     });
   }
   return routes;
@@ -79,7 +79,10 @@ function generateSwaggerSpec(routes) {
 
 async function main() {
   const rootDir = path.resolve(__dirname);
-  const files = await glob(`${rootDir}/{routes,controllers}/*.js`);
+
+  const routeFiles = await glob(`${rootDir}/routes/*.js`);
+  const controllerFiles = await glob(`${rootDir}/controllers/*.js`);
+  const files = [...routeFiles, ...controllerFiles];
 
   let allRoutes = [];
 
@@ -87,6 +90,21 @@ async function main() {
     const content = fs.readFileSync(file, 'utf8');
     allRoutes = allRoutes.concat(extractRoutes(content, file));
   }
+
+  allRoutes = allRoutes.map(route => {
+    const fileName = path.basename(route.file);
+    if (fileName === 'auth') {
+      return { ...route, path: `/api/auth${route.path === '/' ? '' : route.path}` };
+    } else if (fileName === 'users') {
+      return { ...route, path: `/api/users${route.path === '/' ? '' : route.path}` };
+    } else if (fileName === 'jobs') {
+      return { ...route, path: `/api/jobs${route.path === '/' ? '' : route.path}` };
+    } else if (fileName === 'contracts') {
+      return { ...route, path: `/api/contracts${route.path === '/' ? '' : route.path}` };
+    }
+    return route;
+  });
+
   const spec = generateSwaggerSpec(allRoutes);
 
   fs.writeFileSync(path.join(__dirname, 'docs', 'swagger.json'), JSON.stringify(spec, null, 2));

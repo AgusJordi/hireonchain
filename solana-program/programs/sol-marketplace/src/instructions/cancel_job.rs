@@ -1,9 +1,13 @@
-use anchor_lang::prelude::*;
-use crate::state::{Job, JobStatus, seeds};
 use crate::errors::FreelanceError;
 use crate::events::JobCancelled;
+use crate::state::{seeds, Job, JobStatus};
+use anchor_lang::prelude::*;
+use anchor_lang::system_program;
 
 pub fn cancel_job_handler(ctx: Context<CancelJob>) -> Result<()> {
+    let job_key = ctx.accounts.job.key();
+    let vault_bump = ctx.accounts.job.vault_bump;
+
     let job = &mut ctx.accounts.job;
 
     require!(
@@ -21,19 +25,20 @@ pub fn cancel_job_handler(ctx: Context<CancelJob>) -> Result<()> {
     let refund_amount = job.escrow_balance;
 
     if refund_amount > 0 {
-        **ctx.accounts.vault.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .vault
-            .lamports()
-            .checked_sub(refund_amount)
-            .ok_or(FreelanceError::InsufficientFunds)?;
+        let vault_seeds: &[&[u8]] = &[seeds::VAULT, job_key.as_ref(), &[vault_bump]];
+        let signer_seeds = &[vault_seeds];
 
-        **ctx.accounts.client.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .client
-            .lamports()
-            .checked_add(refund_amount)
-            .ok_or(FreelanceError::Overflow)?;
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.client.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            refund_amount,
+        )?;
     }
 
     job.escrow_balance = 0;

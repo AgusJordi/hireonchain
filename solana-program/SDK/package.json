@@ -1,0 +1,13 @@
+{
+  "name": "@hireonchain/sdk",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "@coral-xyz/borsh": "^0.30.1",
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}

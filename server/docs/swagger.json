@@ -29,10 +29,12 @@
     }
   },
   "paths": {
-    "/freelancers": {
+    "/api/users/freelancers": {
       "get": {
-        "tags": ["users"],
-        "summary": "GET /freelancers",
+        "tags": [
+          "users"
+        ],
+        "summary": "GET /api/users/freelancers",
         "security": [
           {
             "bearerAuth": []
@@ -45,10 +47,12 @@
         }
       }
     },
-    "/profile": {
+    "/api/users/profile": {
       "get": {
-        "tags": ["users"],
-        "summary": "GET /profile",
+        "tags": [
+          "users"
+        ],
+        "summary": "GET /api/users/profile",
         "security": [
           {
             "bearerAuth": []
@@ -61,8 +65,10 @@
         }
       },
       "put": {
-        "tags": ["users"],
-        "summary": "PUT /profile",
+        "tags": [
+          "users"
+        ],
+        "summary": "PUT /api/users/profile",
         "security": [
           {
             "bearerAuth": []
@@ -85,10 +91,138 @@
         }
       }
     },
-    "/:id": {
+    "/api/users/:id": {
       "get": {
-        "tags": ["contracts"],
-        "summary": "GET /:id",
+        "tags": [
+          "users"
+        ],
+        "summary": "GET /api/users/:id",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/users/:id/reviews": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "POST /api/users/:id/reviews",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "GET /api/jobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "POST /api/jobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/client/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "GET /api/jobs/client/jobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/jobs/freelancer/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "GET /api/jobs/freelancer/jobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/jobs/:id": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "GET /api/jobs/:id",
         "security": [
           {
             "bearerAuth": []
@@ -101,8 +235,10 @@
         }
       },
       "put": {
-        "tags": ["jobs"],
-        "summary": "PUT /:id",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "PUT /api/jobs/:id",
         "security": [
           {
             "bearerAuth": []
@@ -125,8 +261,10 @@
         }
       },
       "delete": {
-        "tags": ["jobs"],
-        "summary": "DELETE /:id",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "DELETE /api/jobs/:id",
         "security": [
           {
             "bearerAuth": []
@@ -139,10 +277,12 @@
         }
       }
     },
-    "/:id/reviews": {
+    "/api/jobs/:id/proposals": {
       "post": {
-        "tags": ["users"],
-        "summary": "POST /:id/reviews",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "POST /api/jobs/:id/proposals",
         "security": [
           {
             "bearerAuth": []
@@ -165,10 +305,12 @@
         }
       }
     },
-    "/": {
-      "get": {
-        "tags": ["contracts"],
-        "summary": "GET /",
+    "/api/jobs/:id/proposals/:proposalId/accept": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "PUT /api/jobs/:id/proposals/:proposalId/accept",
         "security": [
           {
             "bearerAuth": []
@@ -177,142 +319,228 @@
         "responses": {
           "200": {
             "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/:id/proposals/:proposalId/reject": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "PUT /api/jobs/:id/proposals/:proposalId/reject",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/:id/complete": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "PUT /api/jobs/:id/complete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/:id/contract": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "PUT /api/jobs/:id/contract",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contracts/next-job-id": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "GET /api/contracts/next-job-id",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/contracts/create-onchain": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "POST /api/contracts/create-onchain",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contracts/by-job/:jobId": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "GET /api/contracts/by-job/:jobId",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/contracts/:id/transaction": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "POST /api/contracts/:id/transaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contracts": {
+      "post": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "POST /api/contracts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
           }
         }
       },
-      "post": {
-        "tags": ["contracts"],
-        "summary": "POST /",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/:id/proposals": {
-      "post": {
-        "tags": ["jobs"],
-        "summary": "POST /:id/proposals",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/:id/proposals/:proposalId/accept": {
-      "put": {
-        "tags": ["jobs"],
-        "summary": "PUT /:id/proposals/:proposalId/accept",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/:id/proposals/:proposalId/reject": {
-      "put": {
-        "tags": ["jobs"],
-        "summary": "PUT /:id/proposals/:proposalId/reject",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/:id/complete": {
-      "put": {
-        "tags": ["jobs"],
-        "summary": "PUT /:id/complete",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/client/jobs": {
       "get": {
-        "tags": ["jobs"],
-        "summary": "GET /client/jobs",
+        "tags": [
+          "contracts"
+        ],
+        "summary": "GET /api/contracts",
         "security": [
           {
             "bearerAuth": []
@@ -325,10 +553,12 @@
         }
       }
     },
-    "/freelancer/jobs": {
+    "/api/contracts/:id": {
       "get": {
-        "tags": ["jobs"],
-        "summary": "GET /freelancer/jobs",
+        "tags": [
+          "contracts"
+        ],
+        "summary": "GET /api/contracts/:id",
         "security": [
           {
             "bearerAuth": []
@@ -341,10 +571,12 @@
         }
       }
     },
-    "/:id/contract": {
+    "/api/contracts/:id/status": {
       "put": {
-        "tags": ["jobs"],
-        "summary": "PUT /:id/contract",
+        "tags": [
+          "contracts"
+        ],
+        "summary": "PUT /api/contracts/:id/status",
         "security": [
           {
             "bearerAuth": []
@@ -367,36 +599,12 @@
         }
       }
     },
-    "/:id/status": {
-      "put": {
-        "tags": ["contracts"],
-        "summary": "PUT /:id/status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/:id/dispute": {
+    "/api/contracts/:id/dispute": {
       "post": {
-        "tags": ["contracts"],
-        "summary": "POST /:id/dispute",
+        "tags": [
+          "contracts"
+        ],
+        "summary": "POST /api/contracts/:id/dispute",
         "security": [
           {
             "bearerAuth": []
@@ -419,10 +627,12 @@
         }
       }
     },
-    "/challenge": {
+    "/api/auth/challenge": {
       "post": {
-        "tags": ["auth"],
-        "summary": "POST /challenge",
+        "tags": [
+          "auth"
+        ],
+        "summary": "POST /api/auth/challenge",
         "security": [
           {
             "bearerAuth": []
@@ -445,10 +655,12 @@
         }
       }
     },
-    "/sign": {
+    "/api/auth/sign": {
       "post": {
-        "tags": ["auth"],
-        "summary": "POST /sign",
+        "tags": [
+          "auth"
+        ],
+        "summary": "POST /api/auth/sign",
         "security": [
           {
             "bearerAuth": []
@@ -471,10 +683,12 @@
         }
       }
     },
-    "/register": {
+    "/api/auth/register": {
       "post": {
-        "tags": ["auth"],
-        "summary": "POST /register",
+        "tags": [
+          "auth"
+        ],
+        "summary": "POST /api/auth/register",
         "security": [
           {
             "bearerAuth": []
@@ -497,10 +711,12 @@
         }
       }
     },
-    "/login": {
+    "/api/auth/login": {
       "post": {
-        "tags": ["auth"],
-        "summary": "POST /login",
+        "tags": [
+          "auth"
+        ],
+        "summary": "POST /api/auth/login",
         "security": [
           {
             "bearerAuth": []

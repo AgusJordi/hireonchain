@@ -1,138 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import api from '../utils/api';
 import axios from 'axios';
 import { WalletButton } from '../components/WalletButton';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { useWalletAuth } from '../hooks/useWalletAuth';
 
-interface RegisterForm {
-  username: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  walletAddress: string;
-  role: string;
-  skills: string[] | string;
-  bio: string;
-}
+const registerSchema = z
+  .object({
+    username: z.string().min(1, 'Username is required'),
+    email: z.string().min(1, 'Email is required').email('Email is invalid'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    role: z.enum(['client', 'freelancer']),
+    skills: z.string().optional(),
+    bio: z.string().optional(),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+  .refine(data => data.role !== 'freelancer' || (data.skills && data.skills.trim().length > 0), {
+    message: 'Skills are required for freelancers',
+    path: ['skills'],
+  });
+
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { isConnected, address } = useAppKitAccount();
 
-  const [formData, setFormData] = useState<RegisterForm>({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    walletAddress: '',
-    role: 'client',
-    skills: [],
-    bio: '',
-  });
-
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [walletMessage, setWalletMessage] = useState('');
   const { authenticateWallet } = useWalletAuth();
 
-  // Check if wallet is isConnected
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      role: 'client',
+      skills: '',
+      bio: '',
+    },
+  });
+
+  const selectedRole = watch('role');
+
   useEffect(() => {
     if (address && isConnected) {
       const shortAddress = `${address.toString().slice(0, 4)}...${address.toString().slice(-4)}`;
       setWalletMessage(`Wallet isConnected: ${shortAddress}`);
-      setErrors(prev => ({ ...prev, general: '' }));
+      setApiError('');
     } else {
       setWalletMessage('');
     }
   }, [isConnected, address]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    const skills = [...formData.skills];
-
-    if (name === 'skills') {
-      const skill = value.replace(',', '').trim();
-
-      skills.push(skill);
-
-      setFormData(prevData => ({
-        ...prevData,
-        skills,
-      }));
-
-      return;
-    }
-
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: value,
-    }));
-
-    if (errors[name]) {
-      setErrors(prevErrors => {
-        const newErrors = { ...prevErrors };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    if (formData.role === 'freelancer' && formData.skills.length < 1) {
-      newErrors.skills = 'Skills are required for freelancers';
-    }
-
-    if (address) {
-      setFormData(prevData => ({ ...prevData, walletAddress: address }));
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.dir(formData);
-
-    console.log('1');
-    if (!validateForm()) {
-      return;
-    }
-
+  const onSubmit = async (data: RegisterFormData) => {
     setIsSubmitting(true);
     setApiError('');
 
     try {
       const response = await api.post('/api/auth/register', {
-        ...formData,
+        ...data,
         walletAddress: address,
+        skills: data.skills ? data.skills.split(',').map(skill => skill.trim()) : [],
       });
       localStorage.setItem('sol_token', response.data.token);
       localStorage.setItem('userInfo', JSON.stringify(response.data));
@@ -142,22 +87,19 @@ const Register: React.FC = () => {
 
       if (!success) {
         setApiError('Invalid wallet signature. Please try again.');
-
         return;
       }
 
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         setApiError(error.response.data.message || 'Registration failed. Please try again.');
       } else {
         setApiError('Registration failed. Please try again.');
       }
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
-
-    navigate('/dashboard', { replace: true });
   };
 
   return (
@@ -208,7 +150,7 @@ const Register: React.FC = () => {
 
             <div className="border-t border-secondary-200 pt-6">
               {/* General Error Message */}
-              {(apiError || errors.general) && (
+              {apiError && (
                 <div
                   className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start"
                   role="alert"
@@ -227,11 +169,11 @@ const Register: React.FC = () => {
                       d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{apiError || errors.general}</span>
+                  <span>{apiError}</span>
                 </div>
               )}
 
-              <form className="space-y-6" onSubmit={handleSubmit}>
+              <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                 <div>
                   <label htmlFor="username" className="block text-sm font-medium text-gray-700">
                     Username
@@ -239,17 +181,15 @@ const Register: React.FC = () => {
                   <div className="mt-1">
                     <input
                       id="username"
-                      name="username"
                       type="text"
-                      value={formData.username}
-                      onChange={handleChange}
                       className={`appearance-none block w-full px-3 py-2 border ${
                         errors.username ? 'border-red-300' : 'border-gray-300'
                       } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="Enter your username"
+                      {...register('username')}
                     />
                     {errors.username && (
-                      <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+                      <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
                     )}
                   </div>
                 </div>
@@ -261,17 +201,15 @@ const Register: React.FC = () => {
                   <div className="mt-1">
                     <input
                       id="email"
-                      name="email"
                       type="email"
                       autoComplete="email"
-                      value={formData.email}
-                      onChange={handleChange}
                       className={`appearance-none block w-full px-3 py-2 border ${
                         errors.email ? 'border-red-300' : 'border-gray-300'
                       } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="Enter your email"
+                      {...register('email')}
                     />
-                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
                   </div>
                 </div>
 
@@ -282,18 +220,16 @@ const Register: React.FC = () => {
                   <div className="mt-1">
                     <input
                       id="password"
-                      name="password"
                       type="password"
                       autoComplete="new-password"
-                      value={formData.password}
-                      onChange={handleChange}
                       className={`appearance-none block w-full px-3 py-2 border ${
                         errors.password ? 'border-red-300' : 'border-gray-300'
                       } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="Enter your password"
+                      {...register('password')}
                     />
                     {errors.password && (
-                      <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                      <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
                     )}
                   </div>
                 </div>
@@ -308,18 +244,16 @@ const Register: React.FC = () => {
                   <div className="mt-1">
                     <input
                       id="confirmPassword"
-                      name="confirmPassword"
                       type="password"
                       autoComplete="new-password"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
                       className={`appearance-none block w-full px-3 py-2 border ${
                         errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
                       } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="Confirm your password"
+                      {...register('confirmPassword')}
                     />
                     {errors.confirmPassword && (
-                      <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                      <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
                     )}
                   </div>
                 </div>
@@ -331,11 +265,9 @@ const Register: React.FC = () => {
                   <div className="mt-1">
                     <select
                       id="role"
-                      name="role"
-                      value={formData.role}
-                      onChange={handleChange}
                       className="appearance-none block w-full px-3 py-2 border border-gray-300
                        rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      {...register('role')}
                     >
                       <option value="client">Client</option>
                       <option value="freelancer">Freelancer</option>
@@ -343,7 +275,7 @@ const Register: React.FC = () => {
                   </div>
                 </div>
 
-                {formData.role === 'freelancer' && (
+                {selectedRole === 'freelancer' && (
                   <>
                     <div>
                       <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
@@ -352,17 +284,15 @@ const Register: React.FC = () => {
                       <div className="mt-1">
                         <input
                           id="skills"
-                          name="skills"
                           type="text"
-                          value={formData.skills}
-                          onChange={handleChange}
                           className={`appearance-none block w-full px-3 py-2 border ${
                             errors.skills ? 'border-red-300' : 'border-gray-300'
                           } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                           placeholder="E.g. React, Node.js, Solana"
+                          {...register('skills')}
                         />
                         {errors.skills && (
-                          <p className="mt-1 text-sm text-red-600">{errors.skills}</p>
+                          <p className="mt-1 text-sm text-red-600">{errors.skills.message}</p>
                         )}
                       </div>
                     </div>
@@ -374,14 +304,12 @@ const Register: React.FC = () => {
                       <div className="mt-1">
                         <textarea
                           id="bio"
-                          name="bio"
                           rows={4}
-                          value={formData.bio}
-                          onChange={handleChange}
                           className={`appearance-none block w-full px-3 py-2 border ${
                             errors.bio ? 'border-red-300' : 'border-gray-300'
                           } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                           placeholder="Tell us about yourself and your expertise"
+                          {...register('bio')}
                         />
                       </div>
                     </div>
@@ -391,6 +319,7 @@ const Register: React.FC = () => {
                 <div>
                   <button
                     type="submit"
+                    disabled={isSubmitting || !isConnected}
                     className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                       isSubmitting || !isConnected
                         ? 'bg-indigo-300 cursor-not-allowed'

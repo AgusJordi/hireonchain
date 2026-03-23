@@ -35,7 +35,9 @@ api.interceptors.response.use(
       // localStorage.removeItem('sol_token');
       // localStorage.removeItem('userInfo');
       // window.location.href = "/login";
-      localStorage.clear();
+      localStorage.removeItem('sol_token');
+      localStorage.removeItem('userInfo');
+      localStorage.removeItem('wallet_verified');
     }
     return Promise.reject(error);
   }

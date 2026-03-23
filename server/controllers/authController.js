@@ -43,13 +43,13 @@ const generateChallenge = async (req, res) => {
   }
 };
 
+const CHALLENGE_EXPIRATION_MS = 5 * 60 * 1000;
+
 // @desc    Verify wallet signature
 // @route   POST /api/auth/sign
 // @access  Public
 const verifySignature = async (req, res) => {
   const { publicKey, signature, nonce } = req.body;
-
-  console.dir(req.body);
 
   if (!publicKey || !signature || !nonce) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -66,6 +66,12 @@ const verifySignature = async (req, res) => {
     // Check if nonce matches
     if (challenge.nonce !== nonce) {
       return res.status(401).json({ error: 'Invalid or expired nonce' });
+    }
+
+    const challengeAge = Date.now() - new Date(challenge.createdAt).getTime();
+    if (challengeAge > CHALLENGE_EXPIRATION_MS) {
+      await Challenge.deleteOne({ publicKey });
+      return res.status(401).json({ error: 'Challenge has expired. Please request a new one.' });
     }
 
     const message = `Please authenticate your wallet: ${nonce}`;
@@ -142,11 +148,7 @@ const registerUser = async (req, res) => {
     });
   } catch (error) {
     console.error('REGISTER ERROR:', error);
-    return res.status(500).json({
-      message: 'Server error',
-      error: error.message,
-      stack: error.stack,
-    });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -184,11 +186,7 @@ const loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error('LOGIN ERROR:', error);
-    return res.status(500).json({
-      message: 'Server error',
-      error: error.message,
-      stack: error.stack,
-    });
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 

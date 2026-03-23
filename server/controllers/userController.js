@@ -85,8 +85,18 @@ const getUserById = async (req, res) => {
 // @access  Public
 const getFreelancers = async (req, res) => {
   try {
-    const freelancers = await User.find({ role: 'freelancer' }).select('-password');
-    return res.json(freelancers);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [freelancers, total] = await Promise.all([
+      User.find({ role: 'freelancer' })
+        .select('-password')
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments({ role: 'freelancer' }),
+    ]);
+    return res.json({ freelancers, total, page, pages: Math.ceil(total / limit) });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });
@@ -104,6 +114,11 @@ const addUserReview = async (req, res) => {
       return res.status(400).json({
         message: 'Please provide a rating between 1 and 5',
       });
+    }
+
+    // Prevent self-reviews
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot review yourself' });
     }
 
     const user = await User.findById(req.params.id);

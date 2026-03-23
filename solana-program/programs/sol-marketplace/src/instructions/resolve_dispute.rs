@@ -1,9 +1,16 @@
-use anchor_lang::prelude::*;
-use crate::state::{Job, Dispute, Milestone, MilestoneStatus, PlatformConfig, JobStatus, DisputeStatus, DisputeRuling, seeds};
 use crate::errors::FreelanceError;
 use crate::events::DisputeResolved;
+use crate::state::{
+    seeds, Dispute, DisputeRuling, DisputeStatus, Job, JobStatus, Milestone, MilestoneStatus,
+    PlatformConfig,
+};
+use anchor_lang::prelude::*;
+use anchor_lang::system_program;
 
 pub fn resolve_dispute_handler(ctx: Context<ResolveDispute>, ruling: DisputeRuling) -> Result<()> {
+    let job_key = ctx.accounts.job.key();
+    let vault_bump = ctx.accounts.job.vault_bump;
+
     let job = &mut ctx.accounts.job;
     let dispute = &mut ctx.accounts.dispute;
 
@@ -18,7 +25,10 @@ pub fn resolve_dispute_handler(ctx: Context<ResolveDispute>, ruling: DisputeRuli
     let (client_amount, freelancer_amount) = match ruling {
         DisputeRuling::ClientWins => (escrow_balance, 0u64),
         DisputeRuling::FreelancerWins => (0u64, escrow_balance),
-        DisputeRuling::Split { client_bps, freelancer_bps } => {
+        DisputeRuling::Split {
+            client_bps,
+            freelancer_bps,
+        } => {
             require!(
                 client_bps.checked_add(freelancer_bps) == Some(10000),
                 FreelanceError::InvalidSplitPercentages
@@ -36,36 +46,35 @@ pub fn resolve_dispute_handler(ctx: Context<ResolveDispute>, ruling: DisputeRuli
         DisputeRuling::None => return Err(FreelanceError::InvalidJobStatus.into()),
     };
 
-    if client_amount > 0 {
-        **ctx.accounts.vault.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .vault
-            .lamports()
-            .checked_sub(client_amount)
-            .ok_or(FreelanceError::InsufficientFunds)?;
+    let vault_seeds: &[&[u8]] = &[seeds::VAULT, job_key.as_ref(), &[vault_bump]];
+    let signer_seeds = &[vault_seeds];
 
-        **ctx.accounts.client.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .client
-            .lamports()
-            .checked_add(client_amount)
-            .ok_or(FreelanceError::Overflow)?;
+    if client_amount > 0 {
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.client.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            client_amount,
+        )?;
     }
 
     if freelancer_amount > 0 {
-        **ctx.accounts.vault.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .vault
-            .lamports()
-            .checked_sub(freelancer_amount)
-            .ok_or(FreelanceError::InsufficientFunds)?;
-
-        **ctx.accounts.freelancer.try_borrow_mut_lamports()? = ctx
-            .accounts
-            .freelancer
-            .lamports()
-            .checked_add(freelancer_amount)
-            .ok_or(FreelanceError::Overflow)?;
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.freelancer.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            freelancer_amount,
+        )?;
     }
 
     dispute.status = DisputeStatus::Resolved;
@@ -106,8 +115,10 @@ pub fn resolve_dispute_handler(ctx: Context<ResolveDispute>, ruling: DisputeRuli
     let ruling_str = match ruling {
         DisputeRuling::ClientWins => "ClientWins".to_string(),
         DisputeRuling::FreelancerWins => "FreelancerWins".to_string(),
-        DisputeRuling::Split { client_bps, freelancer_bps } => 
-            format!("Split({},{})", client_bps, freelancer_bps),
+        DisputeRuling::Split {
+            client_bps,
+            freelancer_bps,
+        } => format!("Split({},{})", client_bps, freelancer_bps),
         DisputeRuling::None => "None".to_string(),
     };
 

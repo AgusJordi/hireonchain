@@ -1,14 +1,14 @@
 # Dependencies
 node_modules/
-/client/node_modules
+/app/node_modules
 /server/node_modules
 
 # Production build files
-/client/build
-/client/dist
+/app/build
+/app/dist
 
 # Environment variables
-#.env
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -20,8 +20,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # IDE and editor files
-#.idea/
-#.vscode/
+.idea/
+.vscode/
 *.swp
 *.swo
 
@@ -36,13 +36,11 @@ Thumbs.db
 
 # Rust/Cargo
 /solana-program/target/
+/solana-program/.anchor/
 **/*.rs.bk
 
 # Misc
 .pnp/
 .pnp.js
 coverage/
-#.env.local
-#.env.development.local
-#.env.test.local
-.env.production.local 
+.env.local

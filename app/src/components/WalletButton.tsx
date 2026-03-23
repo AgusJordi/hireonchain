@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
 import toast from 'react-hot-toast';
-import { useState } from 'react';
-import { getBalance } from '../utils/solana';
+import { useState, useEffect } from 'react';
 import { useWalletAuth } from '../hooks/useWalletAuth';
+import { useFreelanceClient } from '../hooks/useFreelanceClient';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 
 export function WalletButton() {
   const navigate = useNavigate();
@@ -12,6 +13,24 @@ export function WalletButton() {
   const [showDetails, setShowDetails] = useState(false);
   const [balance, setBalance] = useState(0);
   const { logout } = useWalletAuth();
+  const sdkClient = useFreelanceClient();
+
+  const fetchBalance = async () => {
+    if (address && isConnected) {
+      try {
+        const balanceLamports = await sdkClient.connection.getBalance(new PublicKey(address));
+        setBalance(balanceLamports / LAMPORTS_PER_SOL);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (showDetails && isConnected && address) {
+      fetchBalance();
+    }
+  }, [showDetails, isConnected, address]);
 
   const handleDisconnect = () => {
     setShowDetails(false);
@@ -24,7 +43,6 @@ export function WalletButton() {
       if (!isConnected) {
         await open({ view: 'Connect', namespace: 'solana' });
         toast.success('Wallet connected!');
-
         return;
       }
     } catch (error) {
@@ -32,12 +50,7 @@ export function WalletButton() {
     }
   };
 
-  const toggleDetails = async () => {
-    if (address) {
-      const sol = await getBalance(address);
-      setBalance(sol);
-    }
-
+  const toggleDetails = () => {
     setShowDetails(!showDetails);
   };
 
@@ -55,55 +68,47 @@ export function WalletButton() {
 
       <div className="relative">
         {isConnected && address && (
-          <>
-            {' '}
-            <button
-              onClick={toggleDetails}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-lg transition-colors group"
-            >
-              {/* Wallet Icon */}
-              <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  />
-                </svg>
-              </div>
-
-              {/* Address */}
-              <span className="text-sm font-medium text-gray-900">
-                {isConnected && '✓ '}
-                {address.slice(0, 4)}...{address.slice(-4)}
-              </span>
-
-              {/* Balance Badge */}
-              {/* <span className="px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-semibold text-gray-700">
-              {formattedBalance} SOL
-            </span> */}
-
-              {/* Chevron */}
+          <button
+            onClick={toggleDetails}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-lg transition-colors group"
+          >
+            {/* Wallet Icon */}
+            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
               <svg
-                className={`h-4 w-4 text-gray-500 transition-transform ${showDetails ? 'rotate-180' : ''}`}
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+                className="w-4 h-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
                 <path
-                  fillRule="evenodd"
-                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                  clipRule="evenodd"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                 />
               </svg>
-            </button>
-          </>
+            </div>
+
+            {/* Address */}
+            <span className="text-sm font-medium text-gray-900">
+              {isConnected && '✓ '}
+              {address.slice(0, 4)}...{address.slice(-4)}
+            </span>
+
+            {/* Chevron */}
+            <svg
+              className={`h-4 w-4 text-gray-500 transition-transform ${showDetails ? 'rotate-180' : ''}`}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
         )}
 
         {showDetails && (
@@ -124,7 +129,7 @@ export function WalletButton() {
                         navigator.clipboard.writeText(address);
                         toast.success('Address copied to clipboard!');
                       } else {
-                        toast.success('Error copying to clipboard!');
+                        toast.error('Error copying to clipboard!');
                       }
                     }}
                     className="p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md transition-colors shrink-0"
@@ -155,7 +160,7 @@ export function WalletButton() {
                 </span>
                 <div className="bg-primary-50 rounded-lg p-3 border border-primary-200">
                   <span className="text-lg font-bold text-primary-900">
-                    {address && balance} SOL
+                    {balance.toFixed(4)} SOL
                   </span>
                 </div>
               </div>

@@ -10,7 +10,6 @@ const getSolanaConnection = () => {
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 const isValidSolanaAddress = address => {
-  console.log(address);
   if (!address || !SOLANA_ADDRESS_REGEX.test(address)) return false;
   try {
     new PublicKey(address);
@@ -46,16 +45,52 @@ const getBalance = async address => {
   }
 };
 
-// Verify transaction
+// Verify transaction exists and was successful
 const verifyTransaction = async signature => {
   try {
     const connection = getSolanaConnection();
-    const transaction = await connection.getTransaction(signature);
-    return transaction;
+    const transaction = await connection.getTransaction(signature, {
+      commitment: 'confirmed',
+    });
+
+    if (!transaction) {
+      return { valid: false, error: 'Transaction not found' };
+    }
+
+    if (transaction.meta?.err) {
+      return { valid: false, error: 'Transaction failed on-chain', details: transaction.meta.err };
+    }
+
+    return { valid: true, transaction };
   } catch (error) {
     console.error('Error verifying transaction:', error);
-    return null;
+    return { valid: false, error: error.message };
   }
+};
+
+const verifyProgramTransaction = async (signature, expectedProgramId) => {
+  const result = await verifyTransaction(signature);
+
+  if (!result.valid) {
+    return result;
+  }
+
+  const { transaction } = result;
+
+  const programId = process.env.SOLANA_PROGRAM_ID;
+  if (!programId) {
+    return { valid: false, error: 'SOLANA_PROGRAM_ID not configured in environment variables' };
+  }
+
+  const involvesProgram = transaction.transaction.message.accountKeys.some(
+    key => key.toString() === programId
+  );
+
+  if (!involvesProgram) {
+    return { valid: false, error: 'Transaction does not involve our program' };
+  }
+
+  return { valid: true, transaction };
 };
 
 module.exports = {
@@ -64,4 +99,5 @@ module.exports = {
   getAccountInfo,
   getBalance,
   verifyTransaction,
+  verifyProgramTransaction,
 };

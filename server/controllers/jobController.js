@@ -29,11 +29,20 @@ const createJob = async (req, res) => {
 // @access  Public
 const getJobs = async (req, res) => {
   try {
-    const jobs = await Job.find({})
-      .populate('client', 'username email walletAddress')
-      .populate('assignedTo', 'username email walletAddress')
-      .sort({ createdAt: -1 });
-    res.json(jobs);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [jobs, total] = await Promise.all([
+      Job.find({})
+        .populate('client', 'username email walletAddress')
+        .populate('assignedTo', 'username email walletAddress')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Job.countDocuments({}),
+    ]);
+    res.json({ jobs, total, page, pages: Math.ceil(total / limit) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -122,7 +131,7 @@ const deleteJob = async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete a job that is in progress' });
     }
 
-    await job.remove();
+    await job.deleteOne();
     res.json({ message: 'Job removed' });
   } catch (error) {
     console.error(error);

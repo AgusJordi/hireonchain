@@ -9,7 +9,7 @@ const projectId = import.meta.env.VITE_PROJECT_ID as string;
 const metadata = {
   name: 'Solana Freelance',
   description: 'Connect, Work, and Get Paid with Crypto',
-  url: 'https://sol-marketplace-1.vercel.app', // origin must match your domain & subdomain
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://sol-marketplace-1.vercel.app',
   icons: ['https://sol-marketplace-1.vercel.app/sol.png'],
 };
 

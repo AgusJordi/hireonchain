@@ -1,31 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { getBalance } from '../utils/solana';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { WalletButton } from '../components/WalletButton';
 import { ProfileModal } from '../components/ProfileModal';
 import { useAppKitAccount } from '@reown/appkit/react';
+import { useFreelanceClient } from '../hooks/useFreelanceClient';
 
-export interface UserProfile {
+interface Review {
+  _id: string;
+  reviewer: {
+    username: string;
+  };
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+interface UserProfile {
   _id: string;
   username: string;
   email: string;
   walletAddress: string;
-  role: string | null;
-  skills: string[] | null;
   bio: string;
+  skills: string[];
+  reviews: Review[];
+  role: string;
   rating: number;
-  reviews:
-    | {
-        from: {
-          _id: string;
-          username: string;
-        };
-        content: string;
-        rating: number;
-        createdAt: string;
-      }[]
-    | null;
+  createdAt: string;
 }
 
 const Profile: React.FC = () => {
@@ -34,289 +36,331 @@ const Profile: React.FC = () => {
   const [error, setError] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [balance, setBalance] = useState<number>(0);
+  const sdkClient = useFreelanceClient();
+
   const [formData, setFormData] = useState<UserProfile>({
     _id: '',
     username: '',
     email: '',
     walletAddress: '',
     bio: '',
-    skills: null,
-    reviews: null,
-    role: null,
+    skills: [],
+    reviews: [],
+    role: '',
     rating: 0,
+    createdAt: '',
   });
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         if (!address) {
-          toast.error('Error fetching profile');
+          setLoading(false);
           return;
         }
 
         const { data } = await api.get<UserProfile>('/api/users/profile');
-        const profile = data;
-
         setFormData({
-          ...profile,
-          username: profile.username,
-          email: profile.email,
-          bio: profile.bio || '',
-          rating: profile.rating || 0,
-          skills: profile.skills ? profile.skills.map(skill => `${skill}, `) : [],
+          ...data,
+          bio: data.bio || '',
+          rating: data.rating || 0,
+          skills: data.skills || [],
+          reviews: data.reviews || [],
         });
+
+        // Fetch wallet balance
+        try {
+          const bal = await sdkClient.connection.getBalance(new PublicKey(address));
+          setBalance(bal / LAMPORTS_PER_SOL);
+        } catch (balError) {
+          console.error('Error fetching balance:', balError);
+        }
+
+        setError('');
       } catch (error) {
-        console.log(error);
-        toast.error('Error fetching profile');
+        console.error('Error fetching profile:', error);
         setError('Failed to load profile');
+        toast.error('Error fetching profile');
       } finally {
         setLoading(false);
       }
     };
 
-    if (loading || !editMode) {
+    if (isConnected && address) {
       fetchProfile();
+    } else {
+      setLoading(false);
     }
-  }, [loading, address, editMode]);
+  }, [isConnected, address, sdkClient.connection]);
 
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (isConnected && address) {
-        try {
-          const solBalance = await getBalance(address.toString());
-          setBalance(solBalance);
-        } catch (error) {
-          console.error('Error fetching balance:', error);
-        }
-      }
-    };
+  const handleEdit = () => {
+    setEditMode(true);
+  };
 
-    fetchBalance();
-  }, [isConnected, address]);
+  const handleSave = async (updatedData: Partial<UserProfile>) => {
+    try {
+      await api.put('/api/users/profile', updatedData);
+      setFormData(prev => ({ ...prev, ...updatedData }));
+      setEditMode(false);
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-secondary-950 via-secondary-900 to-primary-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent mb-4"></div>
-          <p className="text-secondary-600 font-semibold text-lg">Loading formData...</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col items-center justify-center min-h-[50vh]">
+        <svg
+          className="animate-spin h-10 w-10 text-primary-600 mb-4"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <p className="text-lg font-medium text-secondary-600">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col items-center justify-center min-h-[50vh]">
+        <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-8 text-center max-w-md w-full">
+          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-secondary-900 mb-2">Profile</h1>
+          <p className="text-secondary-600 mb-6">Please connect your wallet to view your profile.</p>
+          <WalletButton />
         </div>
       </div>
     );
   }
 
-  if (error && !loading) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-secondary-950 via-secondary-900 to-primary-950 flex items-center justify-center">
-        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-6 max-w-md">
-          <p className="text-red-400 text-center">{error || 'Failed to load profile'}</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col items-center justify-center min-h-[50vh]">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg max-w-md w-full">
+          <div className="flex items-center mb-3">
+            <svg className="h-6 w-6 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">{error}</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
+
+  const roleColors: Record<string, string> = {
+    client: 'bg-blue-100 text-blue-800 border-blue-200',
+    freelancer: 'bg-accent-100 text-accent-800 border-accent-200',
+  };
 
   return (
-    <>
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-primary-600 mb-4">Your Profile</h1>
-
-          {!isConnected && (
-            <div className="bg-primary-500/20 border border-primary-500/30 rounded-xl p-4 flex items-center justify-between">
-              <p className="text-primary-200">Connect your wallet to view your balance</p>
-              <WalletButton />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Profile Header */}
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-6 sm:p-8 mb-8 text-white">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/20 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold backdrop-blur-sm">
+              {formData.username.charAt(0).toUpperCase()}
             </div>
-          )}
-        </div>
-
-        <div className="flex flex-row flex-around gap-6">
-          {/* Sidebar */}
-          <div className="flex w-lg max-w-2xl flex-col space-y-6">
-            {/* Wallet Information */}
-            {isConnected && formData.walletAddress && (
-              <div className="flex flex-col border-2 border-primary-100 rounded-xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold text-primary-600 mb-4">Wallet Information</h2>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-secondary-600 font-bold block">Address</label>
-                    <code className="text-primary-400 font-mono text-lg break-all block">
-                      {formData.walletAddress.slice(0, 8)}...{formData.walletAddress.slice(-8)}
-                    </code>
-                  </div>
-
-                  <div className="font-">
-                    {address === formData.walletAddress ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-500/20 text-accent-600 font-semibold text-sm">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Wallet isConnected
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/20 text-yellow-400 text-sm">
-                        ⚠️ isConnected wallet doesn't match profile
-                      </span>
-                    )}
-                  </div>
-
-                  {balance !== 0 && (
-                    <div>
-                      <label className=" text-secondary-900 block font-semibold">Balance</label>
-                      <div className="text-xl text-primary-400 font-semibold">
-                        {balance.toFixed(4)} <span className="text-primary-400">SOL</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Account Type */}
-            <div className="flex w-lg max-w-2xl flex-col space-y-6"></div>
-            <div className="border-2 border-primary-100 rounded-xl p-6 shadow-xl">
-              <h2 className="text-xl font-semibold text-primary-600 mb-4">Account Type</h2>
-              <div className="inline-flex items-center px-4 py-2 rounded-lg border-primary-600 border-2">
-                <span className="text-lg text-primary-600 font-semibold">
-                  {formData.role === 'client' ? 'Client' : 'Freelancer'}
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">{formData.username}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${roleColors[formData.role] || 'bg-secondary-100 text-secondary-800 border-secondary-200'}`}>
+                  {formData.role}
+                </span>
+                <span className="text-white/70 text-sm">
+                  Member since {new Date(formData.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </span>
               </div>
+            </div>
+          </div>
+          <button
+            onClick={handleEdit}
+            className="px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2 border border-white/20"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Profile
+          </button>
+        </div>
+      </div>
 
-              {formData.rating >= 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm text-secondary-600 font-semibold mb-2">Rating</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-yellow-400 text-xl">
-                      {'★'.repeat(Math.round(formData.rating))}
-                      {'☆'.repeat(5 - Math.round(formData.rating))}
-                    </span>
-                    <span className="text-primary-400 font-semibold">
-                      ({formData.rating.toFixed(1)})
-                    </span>
-                  </div>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Profile Info */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Wallet & Balance Card */}
+          <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-6">
+            <h2 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+              <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Wallet & Balance
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-secondary-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-1">Wallet Address</p>
+                <p className="text-sm font-mono text-secondary-900">
+                  {formData.walletAddress.slice(0, 6)}...{formData.walletAddress.slice(-6)}
+                </p>
+              </div>
+              <div className="bg-secondary-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-1">Balance</p>
+                <p className="text-sm font-semibold text-secondary-900">{balance.toFixed(4)} SOL</p>
+              </div>
+              <div className="bg-secondary-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-1">Email</p>
+                <p className="text-sm text-secondary-900">{formData.email}</p>
+              </div>
+              <div className="bg-secondary-50 rounded-lg p-4">
+                <p className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-1">Rating</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-secondary-900">{formData.rating.toFixed(1)}</span>
+                  <span className="text-amber-400 text-sm">
+                    {'★'.repeat(Math.round(formData.rating))}
+                    {'☆'.repeat(5 - Math.round(formData.rating))}
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="flex w-lg max-w-2xl flex-col space-y-6">
-            {!editMode && (
-              // Profile Display
-              <>
-                <div className="flex w-lg max-w-2xl flex-col space-y-6">
-                  <div className="border-2 border-primary-100 rounded-xl p-6 shadow-xl">
-                    <h2 className="text-xl font-semibold text-primary-600 mb-4">
-                      Personal Information
-                    </h2>
+          {/* Bio Card */}
+          <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-6">
+            <h2 className="text-lg font-bold text-secondary-900 mb-3 flex items-center gap-2">
+              <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              About
+            </h2>
+            <p className="text-secondary-600 leading-relaxed">
+              {formData.bio || <span className="italic text-secondary-400">No bio provided</span>}
+            </p>
+          </div>
 
-                    <div className="space-x-6 flex justify-between mb-2">
-                      <div>
-                        <span className="text-secondary-600 font-semibold block mb-1">
-                          Username
-                        </span>
-                        <span className="text-lg text-primary-400">{formData.username}</span>
-                      </div>
-
-                      <div>
-                        <span className="text-secondary-600 font-semibold block mb-1">Email</span>
-                        <span className="text-lg text-primary-400">{formData.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-x-6 flex justify-between full wrap-break-word">
-                      {formData.bio && (
-                        <div>
-                          <span className="text-sm text-secondary-600 font-semibold block mb-1">
-                            Bio
-                          </span>
-                          <p className="text-primary-400 font-semibold leading-relaxed">
-                            {formData.bio}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => setEditMode(true)}
-                      className="mt-6 font-semibold px-4 py-2 border-2 border-primary-600 hover:border-primary-500 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors w-1/2"
-                    >
-                      Edit Profile
-                    </button>
-                  </div>
-                </div>
-
-                {/* Skills Section */}
-                {formData.role === 'freelancer' && Array.isArray(formData.skills) && (
-                  <div className="flex w-lg max-w-2xl flex-col space-y-6">
-                    <div className="border-2 border-primary-100 rounded-xl p-6 shadow-xl">
-                      <h2 className="text-xl font-semibold text-primary-600 mb-4">Skills</h2>
-                      <div className="flex flex-wrap gap-2">
-                        {formData.skills.map((skill, index) => (
-                          <span
-                            key={index}
-                            className="px-3 py-1.5 bg-primary-500/20 border border-primary-500/30 rounded-lg text-primary-300 text-sm font-medium"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Reviews Section */}
-                {formData.role === 'freelancer' && formData.reviews && (
-                  <div className="flex w-lg max-w-2xl flex-col space-y-6">
-                    <div className="border-2 border-primary-100 rounded-xl p-6 shadow-xl">
-                      <h2 className="text-xl font-semibold text-primary-600 mb-4">
-                        Reviews ({formData.reviews.length})
-                      </h2>
-                      <div className="space-y-4">
-                        {formData.reviews.map((review, index) => (
-                          <div
-                            key={index}
-                            className="bg-secondary-900/50 rounded-lg p-4 border border-secondary-700/30"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-primary-400vvvvvvvvvvvvvvvvvv">
-                                {review.from.username}
-                              </span>
-                              <span className="text-yellow-400">
-                                {'★'.repeat(review.rating)}
-                                {'☆'.repeat(5 - review.rating)}
-                              </span>
-                            </div>
-                            <p className="text-secondary-300 mb-2">{review.content}</p>
-                            <span className="text-xs text-secondary-500">
-                              {new Date(review.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
+          {/* Skills Card */}
+          <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-6">
+            <h2 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+              <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Skills
+            </h2>
+            {formData.skills && formData.skills.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {formData.skills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1.5 bg-primary-50 text-primary-700 text-sm font-medium rounded-full border border-primary-200"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-secondary-400 italic">No skills listed</p>
             )}
+          </div>
+        </div>
 
-            {editMode && formData.role && (
-              // Edit Form
-              <ProfileModal
-                formData={formData}
-                setFormData={setFormData}
-                setEditMode={setEditMode}
-              />
+        {/* Right Column - Reviews & Meta */}
+        <div className="space-y-6">
+          {/* Reviews Card */}
+          <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-6">
+            <h2 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+              <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              Reviews
+              <span className="ml-auto text-sm font-normal text-secondary-500">
+                {formData.reviews?.length || 0}
+              </span>
+            </h2>
+
+            {formData.reviews && formData.reviews.length > 0 ? (
+              <div className="space-y-4">
+                {formData.reviews.map(review => (
+                  <div
+                    key={review._id}
+                    className="border border-secondary-100 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-secondary-900">
+                        {review.reviewer?.username || 'Anonymous'}
+                      </span>
+                      <span className="text-amber-400 text-sm">
+                        {'★'.repeat(review.rating)}
+                        {'☆'.repeat(5 - review.rating)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-secondary-600 leading-relaxed">{review.comment}</p>
+                    <p className="text-xs text-secondary-400 mt-2">
+                      {new Date(review.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-secondary-50 rounded-lg p-6 text-center">
+                <svg className="mx-auto h-10 w-10 text-secondary-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <p className="text-sm text-secondary-500">No reviews yet</p>
+              </div>
             )}
+          </div>
+
+          {/* Quick Stats Card */}
+          <div className="bg-white rounded-xl shadow-card border border-secondary-100 p-6">
+            <h2 className="text-lg font-bold text-secondary-900 mb-4 flex items-center gap-2">
+              <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Quick Stats
+            </h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-secondary-100">
+                <span className="text-sm text-secondary-600">Reviews</span>
+                <span className="text-sm font-semibold text-secondary-900">{formData.reviews?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-secondary-100">
+                <span className="text-sm text-secondary-600">Skills</span>
+                <span className="text-sm font-semibold text-secondary-900">{formData.skills?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-secondary-600">Rating</span>
+                <span className="text-sm font-semibold text-secondary-900">{formData.rating.toFixed(1)} / 5.0</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </>
+
+      {editMode && (
+        <ProfileModal profile={formData} onClose={() => setEditMode(false)} onSave={handleSave} />
+      )}
+    </div>
   );
 };
 

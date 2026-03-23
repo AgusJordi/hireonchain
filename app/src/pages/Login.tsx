@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import api from '../utils/api';
 import axios from 'axios';
 
@@ -7,105 +10,69 @@ import { WalletButton } from '../components/WalletButton';
 import { useWalletAuth } from '../hooks/useWalletAuth';
 import { useAppKitAccount } from '@reown/appkit/react';
 
-interface FormErrors {
-  email?: string;
-  password?: string;
-  general?: string;
-}
+const loginSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .min(6, 'Password must be at least 6 characters'),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { isConnected, address } = useAppKitAccount();
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-
-  const [errors, setErrors] = useState<FormErrors>({});
   const [walletMessage, setWalletMessage] = useState('');
   const [apiError, setApiError] = useState('');
   const { authenticateWallet, isAuthenticating } = useWalletAuth();
 
-  // Check if wallet is isConnected
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
   useEffect(() => {
     if (isConnected && address) {
       const shortAddress = `${address.toString().slice(0, 4)}...${address.toString().slice(-4)}`;
       setWalletMessage(`Wallet isConnected: ${shortAddress}`);
-      setErrors(prev => ({ ...prev, general: '' }));
+      setApiError('');
     } else {
       setWalletMessage('');
     }
   }, [isConnected, address]);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({
-        ...prev,
-        [name]: value,
-      }));
-      if (errors[name as keyof FormErrors]) {
-        setErrors(prev => ({
-          ...prev,
-          [name]: undefined,
-        }));
-      }
-    },
-    [errors]
-  );
-
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const onSubmit = async (data: LoginFormData) => {
     setApiError('');
-    setErrors({});
 
-    // Check wallet connection first
     if (!isConnected || !address) {
-      setErrors({
-        general: 'Please connect your Solana wallet before logging in',
+      setError('root', {
+        type: 'manual',
+        message: 'Please connect your Solana wallet before logging in',
       });
-      return;
-    }
-
-    // validate before submission
-    if (!validateForm()) {
       return;
     }
 
     try {
       const response = await api.post('/api/auth/login', {
-        email: formData.email.toLowerCase().trim(),
-        password: formData.password,
+        email: data.email.toLowerCase().trim(),
+        password: data.password,
       });
 
-      // Validate response structure
       if (!response.data.token || !response.data.walletAddress) {
         setApiError('Invalid response from server. Please try again.');
         return;
       }
 
-      // Verify if the wallet address matches
       const isConnectedWallet = address.toString();
       if (response.data.walletAddress !== isConnectedWallet) {
         setApiError(
@@ -118,18 +85,12 @@ const Login: React.FC = () => {
 
       if (!success) {
         setApiError('Invalid wallet signature. Please try again.');
-
         return;
       }
 
-      // Save authentication data
       localStorage.setItem('sol_token', response.data.token);
       localStorage.setItem('userInfo', JSON.stringify(response.data));
-
-      // Dispatch auth change event for Navbar update
       window.dispatchEvent(new Event('auth-change'));
-
-      // Navigate to dashboard
 
       navigate('/dashboard');
     } catch (error) {
@@ -201,7 +162,7 @@ const Login: React.FC = () => {
 
             <div className="border-t border-secondary-200 pt-6">
               {/* General Error Message */}
-              {(apiError || errors.general) && (
+              {(apiError || errors.root) && (
                 <div
                   className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start"
                   role="alert"
@@ -220,11 +181,11 @@ const Login: React.FC = () => {
                       d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{apiError || errors.general}</span>
+                  <span>{apiError || errors.root?.message}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
                   <label
                     htmlFor="email"
@@ -235,17 +196,15 @@ const Login: React.FC = () => {
                   <input
                     type="email"
                     id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
                     placeholder="you@example.com"
                     disabled={isAuthenticating}
                     className={`w-full px-3 py-2 border rounded-lg shadow-sm placeholder-secondary-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 disabled:bg-secondary-50 disabled:text-secondary-500 disabled:cursor-not-allowed ${
                       errors.email ? 'border-red-300 text-red-900' : 'border-secondary-300'
                     }`}
                     autoComplete="email"
+                    {...register('email')}
                   />
-                  {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                  {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
                 </div>
 
                 <div>
@@ -258,18 +217,16 @@ const Login: React.FC = () => {
                   <input
                     type="password"
                     id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
                     placeholder="Enter your password"
                     disabled={isAuthenticating}
                     className={`w-full px-3 py-2 border rounded-lg shadow-sm placeholder-secondary-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 disabled:bg-secondary-50 disabled:text-secondary-500 disabled:cursor-not-allowed ${
                       errors.password ? 'border-red-300 text-red-900' : 'border-secondary-300'
                     }`}
                     autoComplete="current-password"
+                    {...register('password')}
                   />
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
                   )}
                 </div>
 
