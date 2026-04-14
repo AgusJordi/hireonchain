@@ -24,6 +24,7 @@
     "helmet": "^8.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
+    "bulletproof-json": "^2.0.0",
     "mongoose": "^9.0.1",
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",

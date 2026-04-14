@@ -1,7 +1,7 @@
 const Contract = require('../models/Contract');
 const Job = require('../models/Job');
 const { getNextSequence } = require('../utils/counter');
-const { verifyProgramTransaction } = require('../utils/solana');
+const { verifyAndReconcile } = require('../services/solanaVerificationService');
 
 const CLIENT_ONLY_TYPES = ['fund', 'approve', 'release', 'cancel'];
 
@@ -337,6 +337,7 @@ const recordTransaction = async (req, res) => {
       return res.status(404).json({ message: 'Contract not found' });
     }
 
+    // ── Auth checks (unchanged) ──────────────────────────────
     const isClient = contract.clientId.toString() === req.user._id.toString();
     const isFreelancer = contract.freelancerId.toString() === req.user._id.toString();
     const isAdmin = req.user.role === 'admin';
@@ -357,116 +358,57 @@ const recordTransaction = async (req, res) => {
       return res.status(403).json({ message: 'Only the freelancer can perform this action' });
     }
 
+    // ── On-chain verification (NEW — strict) ─────────────────
     if (ON_CHAIN_TYPES.includes(type)) {
       if (!signature) {
         return res.status(400).json({ message: 'Transaction signature is required' });
       }
 
-      const verification = await verifyProgramTransaction(signature);
-
-      if (!verification.valid) {
-        console.error('Transaction verification failed:', verification.error);
-        return res.status(400).json({
-          message: 'Transaction verification failed',
-          error: verification.error,
-        });
-      }
-
+      // Reject duplicate transactions
       const existingTx = contract.transactions.find(tx => tx.signature === signature);
       if (existingTx) {
         return res.status(400).json({ message: 'Transaction already recorded' });
       }
+
+      // Run strict on-chain verification
+      const verification = await verifyAndReconcile(signature, type, contract, {
+        milestoneId,
+      });
+
+      if (!verification.verified) {
+        console.error('On-chain verification failed:', verification.error);
+        return res.status(400).json({
+          message: 'On-chain verification failed',
+          error: verification.error,
+        });
+      }
+
+      // Use the verified milestone ID from on-chain state (not the frontend-claimed one)
+      const verifiedMilestoneId =
+        verification.milestoneId !== undefined ? verification.milestoneId : milestoneId;
+
+      // Record the transaction with the canonical action and verified data
+      contract.transactions.push({
+        type: verification.canonicalAction || type,
+        signature,
+        milestoneId: verifiedMilestoneId,
+      });
+
+      // ── Apply verified state to MongoDB ──────────────────
+      applyVerifiedState(contract, verification, {
+        type,
+        milestoneId: verifiedMilestoneId,
+        evidence,
+        ruling,
+        isClient,
+      });
+
+      await contract.save();
+      return res.json(contract);
     }
 
+    // ── Non on-chain actions (if any future ones are added) ──
     contract.transactions.push({ type, signature, milestoneId });
-
-    if (type === 'dispute') {
-      contract.status = 'disputed';
-      if (!contract.dispute) {
-        contract.dispute = {};
-      }
-      contract.dispute.status = 'open';
-      contract.dispute.milestoneId = milestoneId;
-      contract.dispute.opener = isClient ? contract.clientWallet : contract.freelancerWallet;
-      contract.dispute.openedAt = new Date();
-    }
-
-    if (type === 'evidence') {
-      if (!contract.dispute || contract.dispute.status !== 'open') {
-        return res.status(400).json({ message: 'No open dispute found' });
-      }
-      if (!evidence) {
-        return res.status(400).json({ message: 'Evidence hash is required' });
-      }
-      if (isClient) {
-        contract.dispute.clientEvidence = evidence;
-      } else {
-        contract.dispute.freelancerEvidence = evidence;
-      }
-    }
-
-    // Handle dispute resolution
-    if (type === 'resolve') {
-      if (!contract.dispute || contract.dispute.status !== 'open') {
-        return res.status(400).json({ message: 'No open dispute found' });
-      }
-      if (!ruling) {
-        return res.status(400).json({ message: 'Ruling is required' });
-      }
-      contract.dispute.status = 'resolved';
-      contract.dispute.ruling = ruling;
-      contract.dispute.resolvedAt = new Date();
-
-      if (ruling === 'client_wins') {
-        if (milestoneId !== undefined && contract.milestones[milestoneId]) {
-          contract.milestones[milestoneId].status = 'cancelled';
-        }
-      } else if (ruling === 'freelancer_wins') {
-        if (milestoneId !== undefined && contract.milestones[milestoneId]) {
-          contract.milestones[milestoneId].status = 'paid';
-        }
-      } else if (ruling === 'split') {
-        if (milestoneId !== undefined && contract.milestones[milestoneId]) {
-          contract.milestones[milestoneId].status = 'split';
-        }
-      }
-
-      const allTerminal = contract.milestones.every(m =>
-        ['paid', 'cancelled', 'split'].includes(m.status)
-      );
-      if (allTerminal) {
-        contract.status = 'completed';
-      } else {
-        contract.status = 'funded';
-      }
-    }
-
-    const contractStatusMap = {
-      fund: 'funded',
-      cancel: 'cancelled',
-    };
-    if (contractStatusMap[type]) {
-      contract.status = contractStatusMap[type];
-    }
-
-    if (milestoneId !== undefined && contract.milestones[milestoneId]) {
-      const milestoneStatusMap = {
-        submit: 'submitted',
-        approve: 'approved',
-        release: 'paid',
-      };
-      if (milestoneStatusMap[type]) {
-        contract.milestones[milestoneId].status = milestoneStatusMap[type];
-      }
-    }
-
-    if (type === 'release') {
-      const allPaid = contract.milestones.every(m => m.status === 'paid');
-      if (allPaid) {
-        contract.status = 'completed';
-      }
-    }
-
     await contract.save();
     res.json(contract);
   } catch (error) {
@@ -475,6 +417,126 @@ const recordTransaction = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+/**
+ * Apply verified on-chain state to a MongoDB contract document.
+ *
+ * This function maps the normalized verification result into the
+ * appropriate contract and milestone status updates. It prefers
+ * on-chain state over frontend-claimed data wherever possible.
+ */
+function applyVerifiedState(contract, verification, opts) {
+  const { type, milestoneId, evidence, ruling, isClient } = opts;
+  const { onChainState } = verification;
+
+  switch (type) {
+    case 'fund':
+      contract.status = 'funded';
+      if (onChainState.escrowBalance) {
+        contract.escrowBalance = onChainState.escrowBalance;
+      }
+      break;
+
+    case 'submit':
+      if (milestoneId !== undefined && contract.milestones[milestoneId]) {
+        contract.milestones[milestoneId].status = 'submitted';
+        if (onChainState.submissionHash) {
+          contract.milestones[milestoneId].submissionHash = onChainState.submissionHash;
+        }
+      }
+      break;
+
+    case 'approve':
+      if (milestoneId !== undefined && contract.milestones[milestoneId]) {
+        contract.milestones[milestoneId].status = 'approved';
+      }
+      break;
+
+    case 'release':
+      if (milestoneId !== undefined && contract.milestones[milestoneId]) {
+        contract.milestones[milestoneId].status = 'paid';
+      }
+      // Use on-chain job status to determine completion
+      if (onChainState.jobStatus === 'completed') {
+        contract.status = 'completed';
+      } else if (onChainState.escrowBalance !== undefined) {
+        contract.escrowBalance = onChainState.escrowBalance;
+      }
+      break;
+
+    case 'cancel':
+      contract.status = 'cancelled';
+      contract.escrowBalance = 0;
+      break;
+
+    case 'dispute':
+      contract.status = 'disputed';
+      if (!contract.dispute) {
+        contract.dispute = {};
+      }
+      contract.dispute.status = 'open';
+      // Use milestoneId from on-chain dispute state (verified)
+      contract.dispute.milestoneId = milestoneId;
+      contract.dispute.opener = onChainState.disputeOpener || verification.signerWallet;
+      contract.dispute.openedAt = new Date();
+      break;
+
+    case 'evidence':
+      if (!contract.dispute) {
+        contract.dispute = {};
+      }
+      // Store evidence from on-chain state
+      if (onChainState.clientEvidence) {
+        contract.dispute.clientEvidence = onChainState.clientEvidence;
+      }
+      if (onChainState.freelancerEvidence) {
+        contract.dispute.freelancerEvidence = onChainState.freelancerEvidence;
+      }
+      break;
+
+    case 'resolve': {
+      if (!contract.dispute) {
+        contract.dispute = {};
+      }
+      // Use on-chain ruling (not frontend-claimed ruling)
+      contract.dispute.status = 'resolved';
+      contract.dispute.ruling = onChainState.ruling || ruling || 'none';
+      contract.dispute.resolvedAt = new Date();
+
+      if (onChainState.splitClientBps) {
+        contract.dispute.splitClientBps = onChainState.splitClientBps;
+      }
+      if (onChainState.splitFreelancerBps) {
+        contract.dispute.splitFreelancerBps = onChainState.splitFreelancerBps;
+      }
+
+      // Update milestone status based on verified ruling
+      const resolvedMilestoneId = milestoneId;
+      if (resolvedMilestoneId !== undefined && contract.milestones[resolvedMilestoneId]) {
+        const rulingMap = {
+          client_wins: 'cancelled',
+          freelancer_wins: 'paid',
+          split: 'split',
+        };
+        const msStatus = rulingMap[onChainState.ruling];
+        if (msStatus) {
+          contract.milestones[resolvedMilestoneId].status = msStatus;
+        }
+      }
+
+      // Determine overall contract status from on-chain job state
+      if (onChainState.jobStatus === 'completed') {
+        contract.status = 'completed';
+      } else {
+        const allTerminal = contract.milestones.every(m =>
+          ['paid', 'cancelled', 'split'].includes(m.status)
+        );
+        contract.status = allTerminal ? 'completed' : 'funded';
+      }
+      break;
+    }
+  }
+}
 
 // @desc    Get contract by job ID
 // @route   GET /api/contracts/by-job/:jobId
