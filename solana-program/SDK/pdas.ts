@@ -56,18 +56,40 @@ export function deriveJobPda(
  * Derive Milestone PDA
  * seeds = [b"milestone", job.key().as_ref(), milestone_id]
  */
+// export function deriveMilestonePda(
+//   programId: PublicKey,
+//   job: PublicKey,
+//   milestoneId: number
+// ): { pda: PublicKey; bump: number } {
+//   const [pda, bump] = PublicKey.findProgramAddressSync(
+//     [MILESTONE_SEED, job.toBuffer(), Buffer.from([milestoneId])],
+//     programId
+//   );
+//   return { pda, bump };
+// }
+/**
+ * Derive Milestone PDA
+ * seeds = [b"milestone", job.key().as_ref(), milestone_id]
+ */
 export function deriveMilestonePda(
   programId: PublicKey,
   job: PublicKey,
   milestoneId: number
 ): { pda: PublicKey; bump: number } {
+  const idAsNumber = Number(milestoneId);
+  if (!Number.isInteger(idAsNumber) || idAsNumber < 0 || idAsNumber > 255) {
+    throw new Error(`milestoneId must be a u8 (0-255). Received: ${milestoneId}`);
+  }
   const [pda, bump] = PublicKey.findProgramAddressSync(
-    [MILESTONE_SEED, job.toBuffer(), Buffer.from([milestoneId])],
+    [
+      MILESTONE_SEED,
+      job.toBuffer(),
+      Buffer.from([idAsNumber]),
+    ],
     programId
   );
   return { pda, bump };
 }
-
 /**
  * Derive Dispute PDA
  * seeds = [b"dispute", job.key().as_ref()]
@@ -76,6 +98,7 @@ export function deriveDisputePda(
   programId: PublicKey,
   job: PublicKey
 ): { pda: PublicKey; bump: number } {
+
   const [pda, bump] = PublicKey.findProgramAddressSync(
     [DISPUTE_SEED, job.toBuffer()],
     programId

@@ -226,6 +226,56 @@ export class FreelanceClient {
   }
 
   /**
+   * Create a job AND initialize all milestone accounts (recommended).
+   *
+   * Why: the on-chain program requires Milestone PDAs to exist before you can
+   * submit/approve/release. `create_job` only initializes the Job (and vault).
+   */
+  async createJobWithMilestones(
+    wallet: WalletSigner,
+    client: PublicKey,
+    freelancer: PublicKey,
+    jobId: bigint,
+    milestoneAmounts: bigint[],
+    milestoneDescriptions: string[],
+    tokenMint: PublicKey = PublicKey.default
+  ): Promise<FreelanceTxResult> {
+    if (milestoneAmounts.length !== milestoneDescriptions.length) {
+      throw new Error("milestoneAmounts and milestoneDescriptions length mismatch");
+    }
+
+    const ixs: TransactionInstruction[] = [];
+    ixs.push(
+      ixCreateJob(
+        client,
+        freelancer,
+        jobId,
+        milestoneAmounts,
+        milestoneDescriptions,
+        tokenMint,
+        this.programId
+      )
+    );
+
+    for (let i = 0; i < milestoneAmounts.length; i++) {
+      const descriptionHash = await sha256Hex(milestoneDescriptions[i]);
+      ixs.push(
+        ixCreateMilestone(
+          client,
+          client,
+          jobId,
+          i,
+          milestoneAmounts[i],
+          descriptionHash,
+          this.programId
+        )
+      );
+    }
+
+    return this.send(wallet, ixs);
+  }
+
+  /**
    * Add a milestone to an existing job
    */
   async createMilestone(
@@ -457,6 +507,27 @@ export class FreelanceClient {
   getVaultPda(job: PublicKey): PublicKey {
     return deriveVaultPda(this.programId, job).pda;
   }
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  // Browser / modern runtimes (WebCrypto)
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    const data = new TextEncoder().encode(input);
+    const digest = await subtle.digest("SHA-256", data);
+    return bufferToHex(new Uint8Array(digest));
+  }
+
+  // Node fallback (tests / scripts)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodeCrypto = require("crypto") as typeof import("crypto");
+  return nodeCrypto.createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+function bufferToHex(bytes: Uint8Array): string {
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
 }
 
 /**

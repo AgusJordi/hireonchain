@@ -7,8 +7,15 @@ import { PublicKey } from "@solana/web3.js";
 export const getProgramId = (): PublicKey => {
     let programIdEnv: string | undefined;
 
-    if (typeof import.meta !== 'undefined') {
-        programIdEnv = (import.meta as any).env?.VITE_SOLANA_PROGRAM_ID;
+    // Browser/Vite environment (import.meta.env) — wrapped in try/catch
+    // so ts-node / CommonJS doesn't choke on the syntax at runtime.
+    try {
+        const importMeta = new Function('return import.meta')() as any;
+        if (importMeta?.env?.VITE_SOLANA_PROGRAM_ID) {
+            programIdEnv = importMeta.env.VITE_SOLANA_PROGRAM_ID;
+        }
+    } catch {
+        // Not a browser/ESM environment — fall through to process.env
     }
 
     if (!programIdEnv && typeof process !== 'undefined') {

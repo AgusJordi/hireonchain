@@ -1,5 +1,6 @@
+const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -11,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const jobRoutes = require('./routes/jobs');
 const contractRoutes = require('./routes/contracts');
+const verifyTxRoutes = require('./routes/verifyTx');
 const PORT = Number(process.env.PORT) || 5000;
 const app = express();
 
@@ -25,20 +27,36 @@ const sanitizeInput = (obj) => {
   return clean;
 };
 
-// Security Middleware
-app.use(helmet());
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',');
-app.use(cors({
+const isDevLocalOrigin = (origin) => {
+  // In dev, allow localhost/127.0.0.1 on any port, http or https
+  if (process.env.NODE_ENV === 'production') return false;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
+
+const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Allow requests with no origin (curl, mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    if (isDevLocalOrigin(origin)) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-}));
+  optionsSuccessStatus: 204,
+};
+
+// CORS must go before helmet so preflight OPTIONS requests are handled first
+app.use(cors(corsOptions));
+// Explicitly handle preflight in Express 5 (avoid '*' path-to-regexp issues)
+app.options(/.*/, cors(corsOptions));
+
+// Security Middleware
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -79,6 +97,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/verify-tx', verifyTxRoutes);
 
 // Root
 app.get('/', (req, res) => {
@@ -89,6 +108,15 @@ app.get('/', (req, res) => {
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 }
+
+// Error handler (keep last)
+app.use((err, _req, res, _next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ message: 'CORS blocked: Origin not allowed' });
+  }
+  console.error('Unhandled error:', err);
+  return res.status(500).json({ message: 'Server error' });
+});
 
 // Start Server
 app.listen(PORT, () => {

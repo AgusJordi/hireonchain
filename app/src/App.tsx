@@ -22,6 +22,7 @@ const JobList = lazy(() => import('./pages/JobList'));
 const JobDetail = lazy(() => import('./pages/JobDetail'));
 const CreateJob = lazy(() => import('./pages/CreateJob'));
 const Profile = lazy(() => import('./pages/Profile'));
+const ContractDetail = lazy(() => import('./pages/ContractDetail'));
 
 const solanaWeb3JsAdapter = new SolanaAdapter();
 const projectId = import.meta.env.VITE_PROJECT_ID as string;
@@ -86,6 +87,14 @@ function App() {
                   element={
                     <PrivateRoute>
                       <JobDetail />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/contracts/:id"
+                  element={
+                    <PrivateRoute>
+                      <ContractDetail />
                     </PrivateRoute>
                   }
                 />

@@ -338,7 +338,7 @@ const JobDetail: React.FC = () => {
       const amounts = milestones.map(m => BigInt(Math.round(parseFloat(m.amount) * 1_000_000_000)));
       const descriptions = milestones.map(m => m.description);
 
-      const result = await sdkClient.createJob(
+      const result = await sdkClient.createJobWithMilestones(
         walletSigner,
         new PublicKey(job.client.walletAddress),
         new PublicKey(job.assignedTo.walletAddress),
